@@ -2,8 +2,11 @@ import numpy as np
 from typing import Any, Dict, List, Optional
 
 # Feature counts per entity type (must match observation_dim in config).
+# Layout for default config (2125 total):
+#   25 + (10 × 20) + (50 × 8) + (30 × 10) + (40 × 30 × 1)
+#   = 25 + 200 + 400 + 300 + 1200 = 2125
 PLAYER_FEATURES = 25
-BOSS_PART_FEATURES = 15
+BOSS_PART_FEATURES = 20
 PROJECTILE_FEATURES = 8
 ENEMY_FEATURES = 10
 TILE_FEATURES = 1  # per tile cell
@@ -15,11 +18,11 @@ class ObservationParser:
     """Converts raw JSON observation dictionaries to fixed-size numpy arrays.
 
     The observation vector layout (total 2125 for default config):
-        [0:25]   Player state (25 features)
-        [25:175] Boss parts (10 × 15 features, zero-padded)
-        [175:575] Projectiles (50 × 8 features, zero-padded)
-        [575:875] Hostile NPCs (30 × 10 features, zero-padded)
-        [875:2075] Tile grid (40 × 30 = 1200 values)
+        [0:25]    Player state (25 features)
+        [25:225]  Boss parts (10 × 20 features, zero-padded)
+        [225:625] Projectiles (50 × 8 features, zero-padded)
+        [625:925] Hostile NPCs (30 × 10 features, zero-padded)
+        [925:2125] Tile grid (40 × 30 = 1200 values)
 
     All positions are relative to the player and normalized.
     HP values are normalized to [0, 1].
@@ -164,7 +167,14 @@ class ObservationParser:
     def _parse_boss_parts(
         self, parts: List[Dict[str, Any]], px: float, py: float
     ) -> np.ndarray:
-        """max_boss_parts × 15 features, zero-padded."""
+        """max_boss_parts × 20 features, zero-padded.
+
+        Feature layout per part (20 total):
+          0: rel_x, 1: rel_y, 2: hp_ratio, 3: vx, 4: vy,
+          5: width, 6: height, 7: phase, 8: is_active, 9: part_type,
+          10: despawn_dist, 11: ai0, 12: ai1, 13: ai2, 14: ai3,
+          15: dist, 16: is_invincible, 17: rotation, 18: scale, 19: target_dist
+        """
         out = np.zeros((self.max_boss_parts, BOSS_PART_FEATURES), dtype=np.float32)
         for i, part in enumerate(parts[: self.max_boss_parts]):
             bx = float(part.get("x", 0.0)) - px
@@ -179,26 +189,36 @@ class ObservationParser:
             is_active = float(part.get("isActive", True))
             part_type = float(part.get("partType", 0)) / 10.0
             despawn_dist = float(part.get("despawnDistance", 0)) / MAX_DISTANCE
-            ai1 = float(part.get("ai0", 0.0)) / 100.0
-            ai2 = float(part.get("ai1", 0.0)) / 100.0
+            ai0 = float(part.get("ai0", 0.0)) / 100.0
+            ai1 = float(part.get("ai1", 0.0)) / 100.0
+            ai2 = float(part.get("ai2", 0.0)) / 100.0
+            ai3 = float(part.get("ai3", 0.0)) / 100.0
             dist = np.sqrt(bx ** 2 + by ** 2) / MAX_DISTANCE
+            rotation = float(part.get("rotation", 0.0)) / np.pi  # normalized to [-1,1]
+            scale = float(part.get("scale", 1.0))
+            target_dist = float(part.get("targetDistance", 0.0)) / MAX_DISTANCE
 
             out[i] = [
-                np.clip(bx / MAX_DISTANCE, -1, 1),
-                np.clip(by / MAX_DISTANCE, -1, 1),
-                hp / max_hp,
-                np.clip(vx / 20.0, -1, 1),
-                np.clip(vy / 20.0, -1, 1),
-                width,
-                height,
-                phase,
-                is_active,
-                part_type,
-                despawn_dist,
-                np.clip(ai1, -1, 1),
-                np.clip(ai2, -1, 1),
-                np.clip(dist, 0, 1),
-                float(part.get("isInvincible", False)),
+                np.clip(bx / MAX_DISTANCE, -1, 1),   # 0
+                np.clip(by / MAX_DISTANCE, -1, 1),   # 1
+                hp / max_hp,                          # 2
+                np.clip(vx / 20.0, -1, 1),           # 3
+                np.clip(vy / 20.0, -1, 1),           # 4
+                width,                                # 5
+                height,                               # 6
+                phase,                                # 7
+                is_active,                            # 8
+                part_type,                            # 9
+                despawn_dist,                         # 10
+                np.clip(ai0, -1, 1),                 # 11
+                np.clip(ai1, -1, 1),                 # 12
+                np.clip(ai2, -1, 1),                 # 13
+                np.clip(ai3, -1, 1),                 # 14
+                np.clip(dist, 0, 1),                 # 15
+                float(part.get("isInvincible", False)),  # 16
+                np.clip(rotation, -1, 1),            # 17
+                np.clip(scale, 0, 3),                # 18
+                np.clip(target_dist, 0, 1),          # 19
             ]
         return out.flatten()
 
