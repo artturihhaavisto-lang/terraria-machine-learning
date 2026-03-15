@@ -30,7 +30,7 @@ namespace TerrariaRLAgent
                 return;
 
             // Only control the local player
-            if (!Player.IsLocal())
+            if (Player.whoAmI != Main.myPlayer)
                 return;
 
             // Suppress all real input so the agent has full control
@@ -56,7 +56,7 @@ namespace TerrariaRLAgent
         /// <summary>
         /// Called when this player takes damage. Records damage for episode tracking.
         /// </summary>
-        public override void OnHurt(Terraria.DataStructures.Player.HurtInfo info)
+        public override void OnHurt(Player.HurtInfo info)
         {
             _wasHurtThisTick = true;
             _hurtAmount = info.Damage;

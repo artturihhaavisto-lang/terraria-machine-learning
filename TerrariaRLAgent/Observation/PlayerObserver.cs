@@ -28,10 +28,11 @@ namespace TerrariaRLAgent.Observation
                            && Collision.SolidCollision(
                                player.position + new Microsoft.Xna.Framework.Vector2(0, player.height),
                                player.width, 4),
-                WingTimeRemaining = player.wingTime,
-                HasDoubleJump     = player.jumpAgainBlizzard || player.jumpAgainCloud ||
-                                    player.jumpAgainFart   || player.jumpAgainSandstorm ||
-                                    player.jumpAgainUnicorn,
+                WingTimeRemaining = (int)player.wingTime,
+                // HasDoubleJump: check wing flight or any active extra-jump option.
+                // In tML 1.4.4 the per-jump booleans were replaced with the ExtraJump
+                // system; use wingTime as the primary flight indicator.
+                HasDoubleJump     = player.wingTime > 0,
                 DashCooldown      = player.dashDelay,
                 ImmuneTicks       = player.immuneTime,
                 DirectionFacing   = player.direction,
@@ -70,24 +71,24 @@ namespace TerrariaRLAgent.Observation
 
         private static string ClassifyItem(Item item)
         {
-            if (item.magic)  return "magic";
-            if (item.melee)  return "melee";
-            if (item.ranged) return "ranged";
-            if (item.summon) return "summon";
+            // tML 1.4.4 replaced item.magic/melee/ranged/summon with the DamageClass system.
+            if (item.CountsAsClass(DamageClass.Magic))  return "magic";
+            if (item.CountsAsClass(DamageClass.Melee))  return "melee";
+            if (item.CountsAsClass(DamageClass.Ranged)) return "ranged";
+            if (item.CountsAsClass(DamageClass.Summon)) return "summon";
             return "other";
         }
 
         /// <summary>
         /// Build a HashSet of vanilla debuff IDs so we can separate buffs from debuffs.
-        /// tModLoader exposes BuffID.Sets.IsADebuff[] for this purpose.
+        /// Uses Main.debuff[] which is a bool[] available in all tML 1.4.x versions.
         /// </summary>
         private static HashSet<int> BuildDebuffSet()
         {
             var set = new HashSet<int>();
-            // BuffID.Sets.IsADebuff is available in tML 1.4+
-            for (int i = 0; i < BuffID.Sets.IsADebuff.Length; i++)
+            for (int i = 0; i < Main.debuff.Length; i++)
             {
-                if (BuffID.Sets.IsADebuff[i])
+                if (Main.debuff[i])
                     set.Add(i);
             }
             return set;

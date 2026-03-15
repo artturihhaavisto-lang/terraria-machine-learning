@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.IO;
@@ -91,7 +92,7 @@ namespace TerrariaRLAgent.Networking
         /// Called from the game (main) thread.
         /// Serializes the observation and pushes it onto the send queue; never blocks.
         /// </summary>
-        public void EnqueueObservation(Observation.ObservationData observation)
+        public void EnqueueObservation(ObservationData observation)
         {
             if (!_isClientConnected) return;
 

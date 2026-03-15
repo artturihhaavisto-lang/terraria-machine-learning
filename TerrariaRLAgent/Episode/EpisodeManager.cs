@@ -386,11 +386,14 @@ namespace TerrariaRLAgent.Episode
                     Main.projectile[i].active = false;
             }
 
-            // Respawn the player if dead
+            // Revive the player if dead (PlayerSpawnContext not available in all tML builds;
+            // set state directly instead).
             Player player = Main.LocalPlayer;
             if (player != null && player.dead)
             {
-                player.Spawn(Terraria.DataStructures.PlayerSpawnContext.ReviveFromDeath);
+                player.dead = false;
+                player.respawnTimer = 0;
+                player.statLife = player.statLifeMax2;
             }
         }
 

@@ -22,15 +22,12 @@ namespace TerrariaRLAgent.Episode
 
             try
             {
-                // Check if this is a vanilla boss that has a standard spawn method
                 if (IsVanillaBossWithSpecialSpawn(npcType))
-                {
                     return SummonVanillaSpecial(player, npcType);
-                }
 
-                // Generic path: use NPC.SpawnOnPlayer for any NPC type
-                int spawnedIndex = NPC.SpawnOnPlayer(player.whoAmI, npcType);
-                return spawnedIndex >= 0 && spawnedIndex < Main.maxNPCs;
+                // Generic path: NPC.SpawnOnPlayer returns void in tML 1.4.4.
+                NPC.SpawnOnPlayer(player.whoAmI, npcType);
+                return true;
             }
             catch (Exception ex)
             {
@@ -48,8 +45,9 @@ namespace TerrariaRLAgent.Episode
             if (npcType <= 0) return false;
             try
             {
+                // NPC.NewNPC first arg is IEntitySource; use the local player as source.
                 int index = NPC.NewNPC(
-                    Terraria.DataStructures.NPC.GetBossSpawnSource(Main.myPlayer),
+                    Main.player[Main.myPlayer].GetSource_FromAI(),
                     (int)worldPosition.X,
                     (int)worldPosition.Y,
                     npcType
@@ -70,43 +68,42 @@ namespace TerrariaRLAgent.Episode
 
         private static bool IsVanillaBossWithSpecialSpawn(int type)
         {
-            return type == NPCID.EyeofCthulhu       ||
-                   type == NPCID.KingSlime           ||
-                   type == NPCID.EaterofWorldsHead   ||
-                   type == NPCID.BrainofCthulhu      ||
-                   type == NPCID.QueenBee             ||
-                   type == NPCID.SkeletronHead        ||
-                   type == NPCID.WallofFlesh          ||
-                   type == NPCID.Retinazer            ||
-                   type == NPCID.Spazmatism           ||
-                   type == NPCID.SkeletronPrime        ||
-                   type == NPCID.TheDestroyer          ||
-                   type == NPCID.Plantera             ||
-                   type == NPCID.Golem                ||
-                   type == NPCID.DukeFishron           ||
-                   type == NPCID.HallowBoss           ||  // Empress of Light
-                   type == NPCID.CultistBoss          ||
+            return type == NPCID.EyeofCthulhu     ||
+                   type == NPCID.KingSlime         ||
+                   type == NPCID.EaterofWorldsHead ||
+                   type == NPCID.BrainofCthulhu    ||
+                   type == NPCID.QueenBee           ||
+                   type == NPCID.SkeletronHead      ||
+                   type == NPCID.WallofFlesh        ||
+                   type == NPCID.Retinazer          ||
+                   type == NPCID.Spazmatism         ||
+                   type == NPCID.SkeletronPrime      ||
+                   type == NPCID.TheDestroyer        ||
+                   type == NPCID.Plantera           ||
+                   type == NPCID.Golem              ||
+                   type == NPCID.DukeFishron         ||
+                   type == NPCID.HallowBoss         ||  // Empress of Light
+                   type == NPCID.CultistBoss        ||
                    type == NPCID.MoonLordCore;
         }
 
         private static bool SummonVanillaSpecial(Player player, int type)
         {
-            // For most vanilla bosses SpawnOnPlayer is sufficient.
-            // Wall of Flesh requires a special item-use path; we use NPC.NewNPC directly
-            // placed below the player in the underworld instead.
+            // Wall of Flesh must be placed explicitly in the underworld.
             if (type == NPCID.WallofFlesh)
             {
                 int wofX = (int)player.Center.X;
-                int wofY = Main.maxTilesY * 16 - 200; // Near lava level
+                int wofY = Main.maxTilesY * 16 - 200;
                 int index = NPC.NewNPC(
-                    Terraria.DataStructures.NPC.GetBossSpawnSource(player.whoAmI),
+                    player.GetSource_FromAI(),
                     wofX, wofY, NPCID.WallofFlesh
                 );
                 return index >= 0;
             }
 
-            int spawned = NPC.SpawnOnPlayer(player.whoAmI, type);
-            return spawned >= 0 && spawned < Main.maxNPCs;
+            // All other vanilla bosses: SpawnOnPlayer handles them (returns void in 1.4.4).
+            NPC.SpawnOnPlayer(player.whoAmI, type);
+            return true;
         }
     }
 }

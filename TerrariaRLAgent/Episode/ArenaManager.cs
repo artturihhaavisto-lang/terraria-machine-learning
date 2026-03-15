@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using Microsoft.Xna.Framework;
 using Terraria;
@@ -159,8 +160,6 @@ namespace TerrariaRLAgent.Episode
                 tile.HasTile  = true;
                 tile.TileType = PlatformTileType;
 
-                // Slope: none (flat platform)
-                tile.Slope    = Terraria.Enums.SlopeType.Solid;
                 tile.IsHalfBlock = false;
             }
         }
