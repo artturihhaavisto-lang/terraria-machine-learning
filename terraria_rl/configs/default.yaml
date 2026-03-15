@@ -1,0 +1,55 @@
+environment:
+  host: "localhost"
+  port: 7777
+  max_episode_ticks: 18000
+  observation_dim: 2125
+  max_projectiles: 50
+  max_enemies: 30
+  max_boss_parts: 10
+  tile_grid_width: 40
+  tile_grid_height: 30
+
+reward:
+  boss_killed: 100.0
+  player_death: -10.0
+  timeout: -15.0
+  damage_dealt_scale: 30.0
+  damage_taken_scale: -15.0
+  survival_per_tick: 0.01
+  proximity_weight: 0.005
+  ideal_combat_range: 300.0
+  dodge_bonus: 0.02
+  dodge_threat_threshold: 3
+
+network:
+  shared_layers: [1024, 512, 256]
+  actor_hidden: 128
+  critic_hidden: 128
+  activation: "relu"
+  use_layer_norm: true
+
+observation:
+  frame_stack: 1
+  frame_stack_mode: "concat"
+
+ppo:
+  learning_rate: 0.0003
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_epsilon: 0.2
+  entropy_coef: 0.01
+  value_loss_coef: 0.5
+  max_grad_norm: 0.5
+  epochs_per_update: 4
+  minibatch_size: 256
+  rollout_length: 4096
+  normalize_advantages: true
+  target_kl: 0.015
+
+training:
+  total_timesteps: 10000000
+  checkpoint_interval: 50
+  log_interval: 1
+  seed: 42
+  device: "cuda"
+  obs_normalization: true

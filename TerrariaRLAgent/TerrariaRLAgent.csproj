@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>TerrariaRLAgent</AssemblyName>
+    <RootNamespace>TerrariaRLAgent</RootNamespace>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Optimize>true</Optimize>
+    <!-- Suppress warnings about XML doc comments and obsolete API -->
+    <NoWarn>$(NoWarn);1591;0618</NoWarn>
+  </PropertyGroup>
+
+  <!-- Locate tModLoader install directory per OS -->
+  <PropertyGroup>
+    <TMLPath Condition="'$(TMLPath)' == '' AND $([MSBuild]::IsOSPlatform('Windows'))">$(MSBuildProgramFiles32)\Steam\steamapps\common\tModLoader</TMLPath>
+    <TMLPath Condition="'$(TMLPath)' == '' AND $([MSBuild]::IsOSPlatform('OSX'))">$(HOME)/Library/Application Support/Steam/steamapps/common/tModLoader</TMLPath>
+    <TMLPath Condition="'$(TMLPath)' == '' AND $([MSBuild]::IsOSPlatform('Linux'))">$(HOME)/.steam/steam/steamapps/common/tModLoader</TMLPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- tModLoader.CodeAssist provides IDE stubs + tML/Terraria reference assemblies -->
+    <PackageReference Include="tModLoader.CodeAssist" Version="0.1.*" />
+  </ItemGroup>
+
+  <!-- If tML assemblies are present locally, reference them directly so the
+       project compiles without NuGet network access. -->
+  <ItemGroup Condition="Exists('$(TMLPath)/tModLoader.dll')">
+    <Reference Include="tModLoader">
+      <HintPath>$(TMLPath)/tModLoader.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup Condition="Exists('$(TMLPath)/Terraria.dll')">
+    <Reference Include="Terraria">
+      <HintPath>$(TMLPath)/Terraria.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

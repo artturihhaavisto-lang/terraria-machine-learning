@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terraria RL Agent Dashboard</title>
+
+  <!-- CDN dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <style>
+    /* ============================================================
+       CSS CUSTOM PROPERTIES
+    ============================================================ */
+    :root {
+      --bg-deep:    #0d0d1a;
+      --bg-panel:   #1a1a2e;
+      --bg-card:    #16213e;
+      --bg-input:   #0f3460;
+      --accent:     #e94560;
+      --accent2:    #533483;
+      --accent3:    #00b4d8;
+      --accent4:    #90e0ef;
+      --green:      #4caf50;
+      --yellow:     #ffd60a;
+      --text:       #e0e0f0;
+      --text-muted: #8888aa;
+      --border:     #2a2a4a;
+      --shadow:     0 4px 24px rgba(0,0,0,.5);
+      --radius:     10px;
+      --chart-h:    220px;
+    }
+
+    /* ============================================================
+       RESET & BASE
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-deep);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    a { color: var(--accent3); text-decoration: none; }
+
+    /* ============================================================
+       SCROLLBARS
+    ============================================================ */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-deep); }
+    ::-webkit-scrollbar-thumb { background: var(--accent2); border-radius: 3px; }
+
+    /* ============================================================
+       LAYOUT SKELETON
+    ============================================================ */
+    #app {
+      display: grid;
+      grid-template-rows: auto auto auto auto auto auto auto;
+      grid-template-columns: 1fr 280px;
+      grid-template-areas:
+        "header  header"
+        "stats   stats"
+        "charts1 charts1"
+        "charts2 charts2"
+        "charts3 charts3"
+        "live    sidebar"
+        "log     sidebar";
+      gap: 14px;
+      padding: 14px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    /* ============================================================
+       PANELS / CARDS
+    ============================================================ */
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    /* ============================================================
+       HEADER
+    ============================================================ */
+    #header {
+      grid-area: header;
+      background: linear-gradient(135deg, var(--bg-panel) 0%, #1f1f3e 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    #header h1 {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      background: linear-gradient(90deg, var(--accent3), var(--accent4));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #header h1 .logo {
+      font-size: 24px;
+      -webkit-text-fill-color: initial;
+    }
+
+    .status-badges {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      border: 1px solid transparent;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .badge-connected   { background: rgba(76,175,80,.15);  border-color: rgba(76,175,80,.4);  color: #81c784; }
+    .badge-connected .badge-dot  { background: #4caf50; box-shadow: 0 0 6px #4caf50; }
+    .badge-disconnected{ background: rgba(233,69,96,.15);  border-color: rgba(233,69,96,.4);  color: #ef9a9a; }
+    .badge-disconnected .badge-dot { background: var(--accent); }
+
+    .badge-training    { background: rgba(0,180,216,.15);  border-color: rgba(0,180,216,.4);  color: var(--accent3); }
+    .badge-training .badge-dot  { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); animation: pulse 1.4s ease-in-out infinite; }
+    .badge-paused      { background: rgba(255,214,10,.15); border-color: rgba(255,214,10,.4); color: var(--yellow); }
+    .badge-paused .badge-dot    { background: var(--yellow); }
+    .badge-eval        { background: rgba(83,52,131,.3);   border-color: rgba(144,100,255,.4);color: #c3a8ff; }
+    .badge-eval .badge-dot      { background: #b388ff; box-shadow: 0 0 6px #b388ff; animation: pulse 1.4s ease-in-out infinite; }
+    .badge-idle        { background: rgba(136,136,170,.1); border-color: rgba(136,136,170,.3); color: var(--text-muted); }
+    .badge-idle .badge-dot      { background: var(--text-muted); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .35; }
+    }
+
+    /* ============================================================
+       STATS CARDS
+    ============================================================ */
+    #stats {
+      grid-area: stats;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+    }
+
+    @media (max-width: 1200px) { #stats { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 700px)  { #stats { grid-template-columns: repeat(2, 1fr); } }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color .2s;
+    }
+    .stat-card:hover { border-color: var(--accent3); }
+
+    .stat-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* ============================================================
+       CHART ROWS
+    ============================================================ */
+    .chart-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    #charts1 { grid-area: charts1; }
+    #charts2 { grid-area: charts2; }
+    #charts3 { grid-area: charts3; }
+
+    @media (max-width: 900px) {
+      .chart-row { grid-template-columns: 1fr; }
+      #app {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "header"
+          "stats"
+          "charts1"
+          "charts2"
+          "charts3"
+          "live"
+          "sidebar"
+          "log";
+      }
+    }
+
+    .chart-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: var(--chart-h);
+    }
+
+    /* ============================================================
+       LIVE GAME STATE
+    ============================================================ */
+    #live { grid-area: live; }
+
+    .live-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 14px;
+    }
+
+    /* HP bars */
+    .hp-section {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .hp-group { display: flex; flex-direction: column; gap: 6px; }
+
+    .hp-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .hp-bar-bg {
+      height: 18px;
+      background: rgba(255,255,255,.05);
+      border-radius: 9px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .hp-bar-fill {
+      height: 100%;
+      border-radius: 9px;
+      transition: width .4s ease;
+    }
+
+    #player-hp-fill {
+      background: linear-gradient(90deg, #2e7d32, #66bb6a);
+      box-shadow: 0 0 8px rgba(76,175,80,.5);
+    }
+    #boss-hp-fill {
+      background: linear-gradient(90deg, #7f0000, #ef5350);
+      box-shadow: 0 0 8px rgba(239,83,80,.5);
+    }
+
+    /* Action indicators */
+    .action-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .action-display {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+
+    .action-icon {
+      font-size: 22px;
+      width: 36px;
+      text-align: center;
+    }
+
+    .action-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--accent3);
+    }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .action-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 4px;
+      text-align: center;
+      font-size: 10px;
+      color: var(--text-muted);
+      transition: all .15s;
+      cursor: default;
+    }
+
+    .action-btn.active {
+      border-color: var(--accent3);
+      background: rgba(0,180,216,.15);
+      color: var(--accent3);
+      box-shadow: 0 0 8px rgba(0,180,216,.3);
+    }
+
+    /* Spatial grid canvas */
+    .grid-section {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #spatial-canvas {
+      display: block;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      image-rendering: pixelated;
+      width: 100%;
+      max-width: 640px;
+    }
+
+    /* ============================================================
+       SIDEBAR (controls + config)
+    ============================================================ */
+    #sidebar {
+      grid-area: sidebar;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .control-btn {
+      display: block;
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: none;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: .04em;
+      transition: opacity .15s, transform .1s, box-shadow .15s;
+    }
+    .control-btn:hover  { opacity: .88; }
+    .control-btn:active { transform: scale(.97); }
+
+    .btn-pause  { background: linear-gradient(135deg, #c62828, var(--accent)); color: #fff; }
+    .btn-resume { background: linear-gradient(135deg, #1b5e20, #43a047); color: #fff; }
+    .btn-save   { background: linear-gradient(135deg, #0d47a1, #1976d2); color: #fff; }
+    .btn-eval   { background: linear-gradient(135deg, var(--accent2), #7e57c2); color: #fff; }
+
+    .config-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .config-table td {
+      padding: 5px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .config-table td:first-child { color: var(--text-muted); }
+    .config-table td:last-child  { text-align: right; color: var(--accent4); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+    /* ============================================================
+       TRAINING LOG
+    ============================================================ */
+    #log { grid-area: log; }
+
+    #log-list {
+      max-height: 220px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 4px;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 10px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      border-left: 3px solid var(--border);
+      background: rgba(255,255,255,.02);
+      font-size: 12px;
+      line-height: 1.4;
+      animation: fadeIn .3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; } }
+
+    .log-time  { color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .log-msg   { color: var(--text); flex: 1; }
+
+    .log-entry.episode_end    { border-color: var(--accent3); }
+    .log-entry.checkpoint     { border-color: var(--yellow); }
+    .log-entry.state_change   { border-color: var(--accent); }
+    .log-entry.episode_start  { border-color: var(--green); }
+    .log-entry.error          { border-color: #ef5350; }
+
+    /* ============================================================
+       UTILITY
+    ============================================================ */
+    .flex-row { display: flex; align-items: center; gap: 10px; }
+    .grow { flex: 1; }
+
+    .no-data {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============================================================
+       HEADER
+  ============================================================ -->
+  <div id="header">
+    <h1><span class="logo">⚔️</span> Terraria RL Agent Dashboard</h1>
+    <div class="status-badges">
+      <span class="badge badge-disconnected" id="conn-badge">
+        <span class="badge-dot"></span>
+        <span id="conn-label">Disconnected</span>
+      </span>
+      <span class="badge badge-idle" id="state-badge">
+        <span class="badge-dot"></span>
+        <span id="state-label">Idle</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       STATS CARDS
+  ============================================================ -->
+  <div id="stats">
+    <div class="stat-card">
+      <div class="stat-label">Episode</div>
+      <div class="stat-value" id="stat-episode">—</div>
+      <div class="stat-sub" id="stat-total-ep">0 total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Timesteps</div>
+      <div class="stat-value" id="stat-timesteps">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Win Rate (100 ep)</div>
+      <div class="stat-value" id="stat-winrate">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Episode Reward</div>
+      <div class="stat-value" id="stat-ep-reward">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Time Elapsed</div>
+      <div class="stat-value" id="stat-elapsed">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Best Reward</div>
+      <div class="stat-value" id="stat-best">—</div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       CHARTS ROW 1
+  ============================================================ -->
+  <div id="charts1" class="chart-row">
+    <div class="chart-panel">
+      <div class="panel-title">Episode Reward</div>
+      <div class="chart-wrap"><canvas id="chart-reward"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="panel-title">Win Rate (rolling 100)</div>
+      <div class="chart-wrap"><canvas id="chart-winrate"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       CHARTS ROW 2
+  ============================================================ -->
+  <div id="charts2" class="chart-row">
+    <div class="chart-panel">
+      <div class="panel-title">Boss HP Remaining at Episode End</div>
+      <div class="chart-wrap"><canvas id="chart-boss-hp"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="panel-title">Episode Length (ticks)</div>
+      <div class="chart-wrap"><canvas id="chart-ep-length"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       CHARTS ROW 3
+  ============================================================ -->
+  <div id="charts3" class="chart-row">
+    <div class="chart-panel">
+      <div class="panel-title">Policy Loss</div>
+      <div class="chart-wrap"><canvas id="chart-policy-loss"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="panel-title">Value Loss &amp; Entropy</div>
+      <div class="chart-wrap"><canvas id="chart-val-entropy"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       LIVE GAME STATE
+  ============================================================ -->
+  <div id="live" class="panel">
+    <div class="panel-title">Live Game State</div>
+    <div class="live-grid">
+
+      <!-- HP bars -->
+      <div class="hp-section">
+        <div class="hp-group">
+          <div class="hp-label-row">
+            <span>Player HP</span>
+            <span id="player-hp-text">500 / 500</span>
+          </div>
+          <div class="hp-bar-bg">
+            <div class="hp-bar-fill" id="player-hp-fill" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="hp-group">
+          <div class="hp-label-row">
+            <span>Boss HP</span>
+            <span id="boss-hp-text">— / —</span>
+          </div>
+          <div class="hp-bar-bg">
+            <div class="hp-bar-fill" id="boss-hp-fill" style="width:100%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action indicators -->
+      <div class="action-section">
+        <div class="action-display">
+          <span class="action-icon" id="action-icon">💤</span>
+          <div>
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em">Current Action</div>
+            <div class="action-name" id="action-name">idle</div>
+          </div>
+        </div>
+        <div class="action-grid" id="action-grid">
+          <!-- filled by JS -->
+        </div>
+      </div>
+
+      <!-- Spatial grid canvas -->
+      <div class="grid-section">
+        <div class="panel-title" style="margin-bottom:4px">Spatial Map (40×30)</div>
+        <canvas id="spatial-canvas" width="400" height="300"></canvas>
+        <div style="display:flex;gap:14px;font-size:11px;color:var(--text-muted)">
+          <span>■ <span style="color:#607d8b">Solid tile</span></span>
+          <span>● <span style="color:#66bb6a">Player</span></span>
+          <span>● <span style="color:#ef5350">Boss</span></span>
+          <span>● <span style="color:var(--yellow)">Projectile</span></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================================================
+       SIDEBAR
+  ============================================================ -->
+  <div id="sidebar">
+
+    <!-- Control panel -->
+    <div class="panel">
+      <div class="panel-title">Controls</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="control-btn btn-pause"  id="btn-pause-resume" onclick="togglePauseResume()">⏸ Pause Training</button>
+        <button class="control-btn btn-save"   onclick="forceSave()">💾 Force Save Checkpoint</button>
+        <button class="control-btn btn-eval"   onclick="switchEval()">🔬 Switch to Eval Mode</button>
+      </div>
+    </div>
+
+    <!-- Config display -->
+    <div class="panel" style="flex:1;overflow:auto">
+      <div class="panel-title">Config</div>
+      <table class="config-table" id="config-table">
+        <tr><td colspan="2" style="color:var(--text-muted);font-style:italic">Not loaded</td></tr>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ============================================================
+       TRAINING LOG
+  ============================================================ -->
+  <div id="log" class="panel">
+    <div class="flex-row" style="margin-bottom:10px">
+      <div class="panel-title grow" style="margin:0">Training Log</div>
+      <button onclick="clearLog()" style="background:none;border:1px solid var(--border);color:var(--text-muted);padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px">Clear</button>
+    </div>
+    <div id="log-list"></div>
+  </div>
+
+</div><!-- /#app -->
+
+<script>
+/* ================================================================
+   CONSTANTS & CONFIG
+================================================================ */
+const MAX_POINTS      = 500;   // max data points kept per chart
+const WIN_RATE_WINDOW = 100;   // rolling window used for per-episode win rate
+
+const ACTION_ICONS = {
+  idle:                    '💤',
+  move_left:               '⬅️',
+  move_right:              '➡️',
+  jump:                    '⬆️',
+  attack:                  '⚔️',
+  move_left_attack:        '⬅⚔️',
+  move_right_attack:       '➡⚔️',
+  jump_attack:             '⬆⚔️',
+  move_left_jump:          '⬅⬆️',
+  move_right_jump:         '➡⬆️',
+  move_left_jump_attack:   '⬅⬆⚔️',
+  move_right_jump_attack:  '➡⬆⚔️',
+};
+
+const ACTION_LIST = Object.keys(ACTION_ICONS);
+
+/* ================================================================
+   CHART.JS DEFAULT THEME
+================================================================ */
+Chart.defaults.color            = '#8888aa';
+Chart.defaults.borderColor      = '#2a2a4a';
+Chart.defaults.font.family      = "'Segoe UI', system-ui, sans-serif";
+Chart.defaults.font.size        = 11;
+Chart.defaults.animation.duration = 250;
+
+function makeDataset(label, color, yAxis) {
+  const ds = {
+    label,
+    data: [],
+    borderColor: color,
+    backgroundColor: color + '22',
+    borderWidth: 2,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+    tension: 0.35,
+    fill: true,
+  };
+  if (yAxis) ds.yAxisID = yAxis;
+  return ds;
+}
+
+function baseOptions(yLabel, extraScales) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: !!extraScales },
+      tooltip: {
+        backgroundColor: '#1a1a2e',
+        borderColor: '#2a2a4a',
+        borderWidth: 1,
+      },
+    },
+    scales: {
+      x: {
+        type: 'linear',
+        ticks: { maxTicksLimit: 6 },
+        grid: { color: '#1e1e38' },
+      },
+      y: {
+        ticks: { maxTicksLimit: 5 },
+        grid: { color: '#1e1e38' },
+        title: { display: !!yLabel, text: yLabel || '' },
+        ...(extraScales ? {} : {}),
+      },
+      ...(extraScales || {}),
+    },
+  };
+}
+
+/* ---- Create charts ---- */
+function makeChart(id, datasets, opts) {
+  const ctx = document.getElementById(id).getContext('2d');
+  return new Chart(ctx, { type: 'line', data: { datasets }, options: opts });
+}
+
+const chartReward = makeChart('chart-reward',
+  [makeDataset('Reward', '#00b4d8')],
+  baseOptions('reward'));
+
+const chartWinRate = makeChart('chart-winrate',
+  [makeDataset('Win Rate', '#4caf50')],
+  { ...baseOptions('%'), scales: { ...baseOptions('%').scales, y: { min: 0, max: 1, ticks: { callback: v => (v*100).toFixed(0)+'%' }, grid: { color: '#1e1e38' } } } });
+
+const chartBossHp = makeChart('chart-boss-hp',
+  [makeDataset('Boss HP Remaining', '#ef5350')],
+  { ...baseOptions('HP'), scales: { ...baseOptions('HP').scales, y: { min: 0, max: 1, ticks: { callback: v => (v*100).toFixed(0)+'%' }, grid: { color: '#1e1e38' } } } });
+
+const chartEpLength = makeChart('chart-ep-length',
+  [makeDataset('Length', '#ffd60a')],
+  baseOptions('ticks'));
+
+const chartPolicyLoss = makeChart('chart-policy-loss',
+  [makeDataset('Policy Loss', '#e94560')],
+  baseOptions('loss'));
+
+const chartValEntropy = makeChart('chart-val-entropy',
+  [makeDataset('Value Loss', '#ff8a65', 'y'), makeDataset('Entropy', '#b388ff', 'y1')],
+  {
+    ...baseOptions(null),
+    plugins: { legend: { display: true } },
+    scales: {
+      x:  { type: 'linear', ticks: { maxTicksLimit: 6 }, grid: { color: '#1e1e38' } },
+      y:  { position: 'left',  ticks: { maxTicksLimit: 5 }, grid: { color: '#1e1e38' }, title: { display: true, text: 'Value Loss' } },
+      y1: { position: 'right', ticks: { maxTicksLimit: 5 }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Entropy' } },
+    },
+  });
+
+/* ================================================================
+   RING BUFFERS (keep last MAX_POINTS entries per series)
+================================================================ */
+const series = {
+  reward:     { x: [], y: [] },
+  winRate:    { x: [], y: [] },
+  bossHp:     { x: [], y: [] },
+  epLength:   { x: [], y: [] },
+  policyLoss: { x: [], y: [] },
+  valueLoss:  { x: [], y: [] },
+  entropy:    { x: [], y: [] },
+};
+
+function pushPoint(s, x, y) {
+  s.x.push(x);  s.y.push(y);
+  if (s.x.length > MAX_POINTS) { s.x.shift(); s.y.shift(); }
+}
+
+function applySeries(chart, seriesArr) {
+  seriesArr.forEach((s, i) => {
+    chart.data.datasets[i].data = s.x.map((xi, j) => ({ x: xi, y: s.y[j] }));
+  });
+  chart.update('none');
+}
+
+/* ================================================================
+   WIN RATE ROLLING CACHE
+================================================================ */
+// Store per-episode results so we can recompute rolling win rate ourselves
+const epResults = [];
+
+function recordEpResult(result) {
+  epResults.push(result === 'win' ? 1 : 0);
+  if (epResults.length > MAX_POINTS + WIN_RATE_WINDOW) epResults.shift();
+}
+
+function rollingWinRate(idx) {
+  const start = Math.max(0, idx - WIN_RATE_WINDOW + 1);
+  const chunk  = epResults.slice(start, idx + 1);
+  return chunk.reduce((a, b) => a + b, 0) / chunk.length;
+}
+
+/* ================================================================
+   FULL SNAPSHOT HANDLER (on connect or refresh)
+================================================================ */
+function applySnapshot(data) {
+  // Episodes
+  if (data.episodes && data.episodes.length) {
+    // Rebuild series from scratch using snapshot
+    data.episodes.forEach(ep => {
+      recordEpResult(ep.result);
+    });
+    const eps = data.episodes;
+    const startIdx = Math.max(0, eps.length - MAX_POINTS);
+    for (let i = startIdx; i < eps.length; i++) {
+      const ep = eps[i];
+      const globalIdx = epResults.length - eps.length + i;
+      pushPoint(series.reward,   ep.episode, ep.reward);
+      pushPoint(series.bossHp,   ep.episode, ep.boss_hp_remaining);
+      pushPoint(series.epLength, ep.episode, ep.length);
+      pushPoint(series.winRate,  ep.episode, rollingWinRate(globalIdx));
+    }
+    applySeries(chartReward,   [series.reward]);
+    applySeries(chartWinRate,  [series.winRate]);
+    applySeries(chartBossHp,   [series.bossHp]);
+    applySeries(chartEpLength, [series.epLength]);
+  }
+
+  // If server sent precomputed rolling win rates, prefer those for larger history
+  if (data.rolling_win_rates && data.rolling_win_rates.length) {
+    const rwr = data.rolling_win_rates;
+    const eps = data.episodes || [];
+    series.winRate = { x: [], y: [] };
+    const startIdx = Math.max(0, rwr.length - MAX_POINTS);
+    for (let i = startIdx; i < rwr.length; i++) {
+      const epNum = eps[i] ? eps[i].episode : (i + 1);
+      pushPoint(series.winRate, epNum, rwr[i]);
+    }
+    applySeries(chartWinRate, [series.winRate]);
+  }
+
+  // Training updates
+  if (data.updates && data.updates.length) {
+    const upds = data.updates;
+    const startIdx = Math.max(0, upds.length - MAX_POINTS);
+    for (let i = startIdx; i < upds.length; i++) {
+      const u = upds[i];
+      pushPoint(series.policyLoss, u.update_step, u.policy_loss);
+      pushPoint(series.valueLoss,  u.update_step, u.value_loss);
+      pushPoint(series.entropy,    u.update_step, u.entropy);
+    }
+    applySeries(chartPolicyLoss, [series.policyLoss]);
+    applySeries(chartValEntropy, [series.valueLoss, series.entropy]);
+  }
+
+  // Summary
+  if (data.summary) updateSummary(data.summary);
+
+  // Live state
+  if (data.live) updateLive(data.live);
+
+  // Log
+  if (data.log) {
+    data.log.forEach(entry => addLogEntry(entry.type, entry.message, entry.timestamp));
+  }
+}
+
+/* ================================================================
+   SUMMARY / STATS CARDS
+================================================================ */
+function fmtNum(v, dec) {
+  if (v === null || v === undefined) return '—';
+  return typeof dec === 'number' ? v.toFixed(dec) : String(v);
+}
+
+function fmtElapsed(secs) {
+  if (!secs) return '—';
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = Math.floor(secs % 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function fmtLargeNum(n) {
+  if (n === null || n === undefined) return '—';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K';
+  return String(n);
+}
+
+function updateSummary(s) {
+  document.getElementById('stat-episode').textContent    = fmtNum(s.episode, 0);
+  document.getElementById('stat-total-ep').textContent   = `${s.total_episodes || 0} total`;
+  document.getElementById('stat-timesteps').textContent  = fmtLargeNum(s.total_timesteps);
+  document.getElementById('stat-winrate').textContent    = s.win_rate != null ? (s.win_rate * 100).toFixed(1) + '%' : '—';
+  document.getElementById('stat-ep-reward').textContent  = fmtNum(s.current_episode_reward, 1);
+  document.getElementById('stat-elapsed').textContent    = fmtElapsed(s.elapsed_seconds);
+  document.getElementById('stat-best').textContent       = fmtNum(s.best_reward, 1);
+
+  updateStateBadge(s.training_state);
+}
+
+function updateStateBadge(state) {
+  const badge = document.getElementById('state-badge');
+  const label = document.getElementById('state-label');
+  badge.className = 'badge badge-' + (state || 'idle');
+  label.textContent = (state || 'idle').charAt(0).toUpperCase() + (state || 'idle').slice(1);
+
+  // Update pause/resume button
+  const btn = document.getElementById('btn-pause-resume');
+  if (state === 'paused') {
+    btn.textContent = '▶ Resume Training';
+    btn.className = 'control-btn btn-resume';
+  } else {
+    btn.textContent = '⏸ Pause Training';
+    btn.className = 'control-btn btn-pause';
+  }
+}
+
+/* ================================================================
+   LIVE STATE
+================================================================ */
+function updateLive(live) {
+  // HP bars
+  const php    = live.player_hp || 0;
+  const phpMax = live.player_hp_max || 500;
+  const bhp    = live.boss_hp || 0;
+  const bhpMax = live.boss_hp_max || 1;
+
+  document.getElementById('player-hp-text').textContent = `${Math.round(php)} / ${Math.round(phpMax)}`;
+  document.getElementById('boss-hp-text').textContent   = `${Math.round(bhp)} / ${Math.round(bhpMax)}`;
+  document.getElementById('player-hp-fill').style.width = Math.max(0, Math.min(100, (php / phpMax) * 100)) + '%';
+  document.getElementById('boss-hp-fill').style.width   = Math.max(0, Math.min(100, (bhp / bhpMax) * 100)) + '%';
+
+  // Action
+  const name = live.action_name || 'idle';
+  document.getElementById('action-icon').textContent = ACTION_ICONS[name] || '❓';
+  document.getElementById('action-name').textContent = name.replace(/_/g, ' ');
+
+  // Action grid buttons
+  const grid = document.getElementById('action-grid');
+  if (grid.children.length === 0) {
+    ACTION_LIST.forEach(a => {
+      const el = document.createElement('div');
+      el.className = 'action-btn';
+      el.id = 'ab-' + a;
+      el.textContent = a.replace(/_/g, ' ');
+      grid.appendChild(el);
+    });
+  }
+  ACTION_LIST.forEach(a => {
+    const el = document.getElementById('ab-' + a);
+    if (el) el.classList.toggle('active', a === name);
+  });
+
+  // Spatial grid
+  drawSpatialGrid(live);
+}
+
+/* ================================================================
+   SPATIAL GRID CANVAS
+================================================================ */
+const GRID_W = 40;
+const GRID_H = 30;
+
+function drawSpatialGrid(live) {
+  const canvas = document.getElementById('spatial-canvas');
+  const ctx    = canvas.getContext('2d');
+  const cw     = canvas.width;
+  const ch     = canvas.height;
+  const tw     = cw / GRID_W;
+  const th     = ch / GRID_H;
+
+  // Background
+  ctx.fillStyle = '#0a0a14';
+  ctx.fillRect(0, 0, cw, ch);
+
+  // Grid lines
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x <= GRID_W; x++) {
+    ctx.beginPath(); ctx.moveTo(x * tw, 0); ctx.lineTo(x * tw, ch); ctx.stroke();
+  }
+  for (let y = 0; y <= GRID_H; y++) {
+    ctx.beginPath(); ctx.moveTo(0, y * th); ctx.lineTo(cw, y * th); ctx.stroke();
+  }
+
+  // Tiles
+  const grid = live.tile_grid || [];
+  for (let row = 0; row < grid.length && row < GRID_H; row++) {
+    for (let col = 0; col < (grid[row] || []).length && col < GRID_W; col++) {
+      if (grid[row][col]) {
+        ctx.fillStyle = '#607d8b';
+        ctx.fillRect(col * tw + 0.5, row * th + 0.5, tw - 1, th - 1);
+      }
+    }
+  }
+
+  // Projectiles
+  (live.projectiles || []).forEach(p => {
+    if (p.x < 0 || p.x >= GRID_W || p.y < 0 || p.y >= GRID_H) return;
+    ctx.fillStyle = '#ffd60a';
+    const cx2 = (p.x + 0.5) * tw;
+    const cy2 = (p.y + 0.5) * th;
+    ctx.beginPath();
+    ctx.arc(cx2, cy2, Math.min(tw, th) * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Boss
+  if (live.boss_x != null && live.boss_y != null) {
+    const bx = (live.boss_x + 0.5) * tw;
+    const by = (live.boss_y + 0.5) * th;
+    ctx.fillStyle = '#ef5350';
+    ctx.shadowColor = '#ef5350';
+    ctx.shadowBlur  = 8;
+    ctx.beginPath();
+    ctx.arc(bx, by, Math.min(tw, th) * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // Player
+  if (live.player_x != null && live.player_y != null) {
+    const px = (live.player_x + 0.5) * tw;
+    const py = (live.player_y + 0.5) * th;
+    ctx.fillStyle = '#66bb6a';
+    ctx.shadowColor = '#66bb6a';
+    ctx.shadowBlur  = 8;
+    ctx.beginPath();
+    ctx.arc(px, py, Math.min(tw, th) * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+}
+
+/* ================================================================
+   EPISODE UPDATE
+================================================================ */
+function applyEpisodeUpdate(data) {
+  const ep  = data.metrics || {};
+  const sum = data.summary || {};
+
+  if (ep.episode != null) {
+    recordEpResult(ep.result);
+    const wr = rollingWinRate(epResults.length - 1);
+    pushPoint(series.reward,   ep.episode, ep.reward);
+    pushPoint(series.winRate,  ep.episode, wr);
+    pushPoint(series.bossHp,   ep.episode, ep.boss_hp_remaining);
+    pushPoint(series.epLength, ep.episode, ep.length);
+
+    applySeries(chartReward,   [series.reward]);
+    applySeries(chartWinRate,  [series.winRate]);
+    applySeries(chartBossHp,   [series.bossHp]);
+    applySeries(chartEpLength, [series.epLength]);
+  }
+
+  if (sum) updateSummary(sum);
+}
+
+/* ================================================================
+   TRAINING UPDATE
+================================================================ */
+function applyTrainingUpdate(u) {
+  if (u.update_step == null) return;
+  pushPoint(series.policyLoss, u.update_step, u.policy_loss);
+  pushPoint(series.valueLoss,  u.update_step, u.value_loss);
+  pushPoint(series.entropy,    u.update_step, u.entropy);
+
+  applySeries(chartPolicyLoss, [series.policyLoss]);
+  applySeries(chartValEntropy, [series.valueLoss, series.entropy]);
+}
+
+/* ================================================================
+   LOG
+================================================================ */
+function fmtTimestamp(ts) {
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function addLogEntry(type, message, timestamp) {
+  const list = document.getElementById('log-list');
+  const el   = document.createElement('div');
+  el.className = 'log-entry ' + (type || '');
+  el.innerHTML = `<span class="log-time">${fmtTimestamp(timestamp || Date.now() / 1000)}</span><span class="log-msg">${escapeHtml(message)}</span>`;
+  list.prepend(el);
+  // Trim
+  while (list.children.length > 200) list.removeChild(list.lastChild);
+}
+
+function clearLog() {
+  document.getElementById('log-list').innerHTML = '';
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ================================================================
+   CONFIG TABLE
+================================================================ */
+function renderConfig(cfg) {
+  const table = document.getElementById('config-table');
+  table.innerHTML = '';
+  if (!cfg || !Object.keys(cfg).length) {
+    table.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted);font-style:italic">Not available</td></tr>';
+    return;
+  }
+  Object.entries(cfg).forEach(([k, v]) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${escapeHtml(k)}</td><td>${escapeHtml(String(v))}</td>`;
+    table.appendChild(tr);
+  });
+}
+
+/* ================================================================
+   CONTROL BUTTONS
+================================================================ */
+let trainingState = 'idle';
+
+async function post(url) {
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    return await res.json();
+  } catch (e) {
+    addLogEntry('error', `Request to ${url} failed: ${e.message}`, Date.now() / 1000);
+  }
+}
+
+function togglePauseResume() {
+  const url = trainingState === 'paused' ? '/api/control/resume' : '/api/control/pause';
+  post(url).then(data => {
+    if (data && data.state) {
+      trainingState = data.state;
+      updateStateBadge(data.state);
+      addLogEntry('state_change', `Training ${data.state} via dashboard`, Date.now() / 1000);
+    }
+  });
+}
+
+function forceSave() {
+  post('/api/control/save').then(() => {
+    addLogEntry('checkpoint', 'Manual checkpoint save requested', Date.now() / 1000);
+  });
+}
+
+function switchEval() {
+  post('/api/control/eval').then(data => {
+    if (data && data.state) {
+      trainingState = data.state;
+      updateStateBadge(data.state);
+      addLogEntry('state_change', 'Switched to eval mode', Date.now() / 1000);
+    }
+  });
+}
+
+/* ================================================================
+   LOAD CONFIG
+================================================================ */
+async function loadConfig() {
+  try {
+    const res = await fetch('/api/config');
+    const cfg = await res.json();
+    renderConfig(cfg);
+  } catch (_) { /* server not ready yet */ }
+}
+
+/* ================================================================
+   SOCKET.IO CONNECTION
+================================================================ */
+const socket = io({ transports: ['websocket', 'polling'], reconnectionDelay: 1500 });
+
+socket.on('connect', () => {
+  document.getElementById('conn-badge').className = 'badge badge-connected';
+  document.getElementById('conn-label').textContent = 'Connected';
+  addLogEntry('info', 'Connected to dashboard server', Date.now() / 1000);
+  loadConfig();
+});
+
+socket.on('disconnect', () => {
+  document.getElementById('conn-badge').className = 'badge badge-disconnected';
+  document.getElementById('conn-label').textContent = 'Disconnected';
+  addLogEntry('error', 'Lost connection to dashboard server', Date.now() / 1000);
+});
+
+socket.on('full_snapshot', data => {
+  applySnapshot(data);
+  addLogEntry('info', 'Received full data snapshot from server', Date.now() / 1000);
+});
+
+socket.on('episode_update', data => {
+  applyEpisodeUpdate(data);
+  const ep = (data.metrics || {});
+  if (ep.episode != null) {
+    addLogEntry('episode_end',
+      `Episode ${ep.episode} — reward: ${(ep.reward||0).toFixed(2)}, result: ${ep.result || '?'}, length: ${ep.length || 0} ticks`,
+      ep.timestamp || Date.now() / 1000);
+  }
+  if (data.summary) {
+    trainingState = data.summary.training_state || trainingState;
+  }
+});
+
+socket.on('tick_update', data => {
+  updateLive(data);
+  if (data.training_state) {
+    trainingState = data.training_state;
+    updateStateBadge(data.training_state);
+  }
+  // Update current episode reward in stats
+  if (data.episode_reward != null) {
+    document.getElementById('stat-ep-reward').textContent = data.episode_reward.toFixed(1);
+  }
+});
+
+socket.on('training_update', data => {
+  applyTrainingUpdate(data);
+});
+
+socket.on('log_event', data => {
+  addLogEntry(data.type, data.message, data.timestamp);
+});
+
+/* ================================================================
+   INITIAL DATA FETCH (REST fallback)
+================================================================ */
+async function initialFetch() {
+  try {
+    const [statusRes, metricsRes] = await Promise.all([
+      fetch('/api/status'),
+      fetch('/api/metrics?n=500'),
+    ]);
+    const status  = await statusRes.json();
+    const metrics = await metricsRes.json();
+
+    applySnapshot({
+      summary:  status,
+      episodes: metrics.episodes || [],
+      updates:  metrics.updates  || [],
+      log:      metrics.log      || [],
+    });
+
+    trainingState = status.training_state || 'idle';
+  } catch (_) { /* no data yet */ }
+}
+
+initialFetch();
+
+/* ================================================================
+   INITIAL SPATIAL CANVAS PLACEHOLDER
+================================================================ */
+(function() {
+  const canvas = document.getElementById('spatial-canvas');
+  const ctx    = canvas.getContext('2d');
+  ctx.fillStyle = '#0a0a14';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 0.5;
+  const tw = canvas.width / GRID_W, th = canvas.height / GRID_H;
+  for (let x = 0; x <= GRID_W; x++) { ctx.beginPath(); ctx.moveTo(x*tw,0); ctx.lineTo(x*tw,canvas.height); ctx.stroke(); }
+  for (let y = 0; y <= GRID_H; y++) { ctx.beginPath(); ctx.moveTo(0,y*th); ctx.lineTo(canvas.width,y*th); ctx.stroke(); }
+  ctx.fillStyle = '#2a2a4a';
+  ctx.font = '13px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('Waiting for game data…', canvas.width/2, canvas.height/2);
+})();
+</script>
+</body>
+</html>

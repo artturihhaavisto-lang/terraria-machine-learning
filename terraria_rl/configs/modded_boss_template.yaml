@@ -1,0 +1,81 @@
+# Modded Boss Template Configuration
+# Copy this file and customize for your specific modded boss.
+# Override only the values you need to change from default.yaml.
+
+environment:
+  host: "localhost"
+  port: 7777
+  # Maximum number of ticks per episode before timeout penalty.
+  # Increase for bosses with longer fight durations.
+  max_episode_ticks: 18000
+  observation_dim: 2125
+  max_projectiles: 50   # Increase if boss fires many projectiles
+  max_enemies: 30        # Increase if boss spawns many minions
+  max_boss_parts: 10     # Increase for multi-part bosses
+  tile_grid_width: 40
+  tile_grid_height: 30
+
+reward:
+  # Terminal reward given when the boss is killed.
+  boss_killed: 100.0
+  # Terminal penalty given when the player dies.
+  player_death: -10.0
+  # Terminal penalty given when the episode times out without killing the boss.
+  timeout: -15.0
+  # Scale factor for damage dealt per tick (damage / boss_max_hp * scale).
+  damage_dealt_scale: 30.0
+  # Scale factor for damage taken per tick (damage / player_max_hp * scale).
+  damage_taken_scale: -15.0
+  # Small reward given every tick the player survives.
+  survival_per_tick: 0.01
+  # Weight for proximity-based reward shaping.
+  proximity_weight: 0.005
+  # Ideal distance (in pixels) from the boss for combat.
+  # Adjust based on boss attack patterns and arena size.
+  ideal_combat_range: 300.0
+  # Bonus reward when the agent successfully dodges (nearby threats but no damage taken).
+  dodge_bonus: 0.02
+  # Minimum number of threatening projectiles to trigger dodge detection.
+  dodge_threat_threshold: 3
+
+network:
+  # Sizes of shared backbone layers. Larger networks may improve performance
+  # for more complex bosses but require more training time.
+  shared_layers: [1024, 512, 256]
+  actor_hidden: 128
+  critic_hidden: 128
+  activation: "relu"
+  use_layer_norm: true
+
+observation:
+  # Number of frames to stack. Use 1 for no stacking (default).
+  # Higher values give the agent temporal information but increase input size.
+  frame_stack: 1
+  frame_stack_mode: "concat"  # Options: "concat"
+
+ppo:
+  learning_rate: 0.0003
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_epsilon: 0.2
+  entropy_coef: 0.01
+  value_loss_coef: 0.5
+  max_grad_norm: 0.5
+  epochs_per_update: 4
+  minibatch_size: 256
+  rollout_length: 4096
+  normalize_advantages: true
+  target_kl: 0.015
+
+training:
+  # Total environment steps to train for.
+  total_timesteps: 10000000
+  # Save a checkpoint every N PPO updates.
+  checkpoint_interval: 50
+  # Log metrics every N PPO updates.
+  log_interval: 1
+  seed: 42
+  # Set to "cpu" if no CUDA-capable GPU is available.
+  device: "cuda"
+  # Whether to normalize observations using running mean/std.
+  obs_normalization: true

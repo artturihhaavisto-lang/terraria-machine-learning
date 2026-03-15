@@ -1,0 +1,1 @@
+Terraria RL Agent is a tModLoader mod that exposes a TCP socket interface for reinforcement learning agents to control the player and observe game state. It streams structured JSON observations (player, boss, projectiles, enemies, tile grid) each game tick and receives discrete/continuous action commands in return. Designed to train ML models to defeat bosses autonomously.

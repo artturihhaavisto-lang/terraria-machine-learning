@@ -1,0 +1,4 @@
+displayName = Terraria RL Agent
+author = TerrariaRL
+version = 1.0.0
+buildIgnore = *.csproj, obj\*, bin\*, .git\*
