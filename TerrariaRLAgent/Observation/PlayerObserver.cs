@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Terraria;
 using Terraria.ID;
+using Terraria.ModLoader;
 using TerrariaRLAgent.Networking;
 
 namespace TerrariaRLAgent.Observation
