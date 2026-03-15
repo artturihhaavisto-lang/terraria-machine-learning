@@ -15,8 +15,8 @@ namespace TerrariaRLAgent.Episode
     /// </summary>
     public static class ArenaManager
     {
-        // Tile type used for platforms (wood platform = 19)
-        private const ushort PlatformTileType = TileID.WoodPlatform;
+        // Tile type used for platforms. TileID.WoodPlatform == 19.
+        private const ushort PlatformTileType = 19;
 
         // -----------------------------------------------------------------------
         // Public API
