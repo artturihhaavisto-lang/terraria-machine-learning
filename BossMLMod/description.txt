@@ -1,0 +1,3 @@
+Reinforcement learning framework for training ML agents to fight Terraria bosses.
+Provides TCP-based communication, game state extraction, and input injection via tModLoader hooks.
+Single-player only. Designed for use with the terraria_boss_agent Python package.

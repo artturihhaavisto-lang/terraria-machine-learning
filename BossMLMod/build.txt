@@ -1,0 +1,5 @@
+displayName = Boss ML Mod
+author = BossMLAgent
+version = 0.1.0
+buildIgnore = *.md, .git/*, .vs/*
+homepage =

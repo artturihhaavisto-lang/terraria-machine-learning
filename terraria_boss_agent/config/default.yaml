@@ -1,0 +1,25 @@
+reward:
+  boss_damage_weight: 4
+  player_damage_weight: 5
+  boss_kill_bonus: 500
+  death_penalty: 200
+  survival_bonus: 0.01
+  despawn_penalty: 100
+  nohit_bonus: 0
+  hit_compounding_penalty: 0
+  nohit_kill_bonus: 0
+  flawless_kill_bonus: 0
+  wasteful_heal_penalty: 0
+  proximity_bonus: 0
+  proximity_radius_blocks: 15
+  distance_sq_penalty_weight: 0
+  dodge_streak_bonus: 0
+  dps_bonus_weight: 0
+  idle_penalty_per_sec: 0
+  distance_penalty_weight: 0
+training:
+  ent_coef: 0.01
+  learning_rate: 0.00015
+  n_epochs: 4
+  n_steps: 4096
+boss_type: 4
