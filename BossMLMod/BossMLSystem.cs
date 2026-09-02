@@ -43,6 +43,9 @@ public class BossMLSystem : ModSystem
     // --- Auto-reset ---
     private int _resetCountdown = -1;
 
+    // --- Auto-enable ML mode (headless fleets) ---
+    private int _autoEnableCountdown = -1;
+
     // --- God mode ---
     public bool GodMode { get; set; }
 
@@ -91,6 +94,7 @@ public class BossMLSystem : ModSystem
         MLModeActive = false;
         _resetCountdown = -1;
         _doneSent = false;
+        _autoEnableCountdown = config.AutoEnableML ? 180 : -1;
     }
 
     public override void OnWorldUnload()
@@ -111,6 +115,19 @@ public class BossMLSystem : ModSystem
             else if (!connected && _wasConnected)
                 Main.NewText("[BML] Python agent DISCONNECTED", 255, 100, 100);
             _wasConnected = connected;
+        }
+
+        // Auto-enable ML mode once the Python agent connects (headless fleets)
+        if (!MLModeActive && _autoEnableCountdown > 0 && Server != null && Server.IsConnected
+            && Main.LocalPlayer != null && Main.LocalPlayer.active && !Main.LocalPlayer.dead)
+        {
+            if (--_autoEnableCountdown == 0)
+            {
+                MLModeActive = true;
+                _doneSent = false;
+                ResetEpisode();
+                Main.NewText("[BML] ML mode AUTO-ENABLED (agent connected)", 100, 255, 100);
+            }
         }
 
         if (!MLModeActive || Server == null || !Server.IsConnected) return;
@@ -324,6 +341,15 @@ public class BossMLSystem : ModSystem
     {
         var config = BossMLConfig.Instance;
         var player = Main.LocalPlayer;
+
+        // Force time of day if configured (night-only bosses on headless instances)
+        switch ((config.ForceTimeOfDay ?? "none").ToLowerInvariant())
+        {
+            case "day":      SetTime(0, true);      break;
+            case "noon":     SetTime(27000, true);  break;
+            case "night":    SetTime(0, false);     break;
+            case "midnight": SetTime(16200, false); break;
+        }
 
         // Revive if dead — directly reset death state
         if (player.dead)
