@@ -62,4 +62,12 @@ public class BossMLConfig : ModConfig
     [Range(1, 10)]
     [DefaultValue(4)]
     public int FrameSkip { get; set; } = 4;
+
+    [Header("Automation")]
+    [DefaultValue(false)]
+    public bool AutoEnableML { get; set; } = false;
+
+    [DefaultValue("none")]
+    public string ForceTimeOfDay { get; set; } = "none";
+
 }
